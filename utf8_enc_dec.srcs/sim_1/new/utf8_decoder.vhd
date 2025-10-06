@@ -45,6 +45,42 @@ begin
             if out_ready = '1' then
                 out_valid <= '0';
              end if;
+
+             -- New input byte
+             if in_valid = '1' and in_ready = '1' then
+                err_unexp_lead_b <= '0';
+                err_unexp_cont_b <= '0';
+                err_utf16_surrogate <= '0';
+                err_invalid_val_b <= '0';
+
+                if in_byte(7 downto 6) = "10" then -- continuation
+
+                    if bytes_left = 0 then
+                        err_unexp_cont_b <= '1';
+                    else
+                        out_codepoint <= out_codepoint(14 downto 0) & in_byte(5 downto 0);
+                        bytes_left <= bytes_left - 1;
+
+                        if bytes_left = 1 then
+                            out_valid < '1';
+                        -- Lead byte 0xED
+                        elsif bytes_left = 2 and out_codepoint(3 downto 0) = x"D" then
+                            -- check whether the cont byte is 0xA0 or higher
+                            if in_byte(7 downto 5) = "101" then
+                                err_utf16_surrogate <= '1';
+                                bytes_left <= 0;
+                            end if;
+                        end if;
+
+                    end if;
+
+                else -- lead byte
+                    bytes_left <= 0;
+
+                    if (bytes_left > 0) then
+                        err_unexp_lead_b <= '1';
+                    end if;
+             
         end if;
     end if;
 
